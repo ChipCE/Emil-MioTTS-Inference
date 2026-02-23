@@ -80,6 +80,9 @@ services:
       # ── HuggingFace model cache ────────────────────────────────────────────
       HF_HOME: "/root/.cache/huggingface"
 
+    networks:
+      - emil-net
+
   # ─────────────────────────────────────────────────────────────────────────
   # Gradio WebUI  (run_gradio.py)
   # ─────────────────────────────────────────────────────────────────────────
@@ -96,7 +99,8 @@ services:
     ports:
       - "0.0.0.0:7860:7860"
 
-    # Gradio talks to the miotts API service (internal Docker network)
+    # Gradio talks to the miotts service via the shared emil-net network
+
     depends_on:
       - miotts
 
@@ -119,5 +123,18 @@ services:
       GRADIO_SERVER_NAME: "0.0.0.0"
       GRADIO_SERVER_PORT: "7860"
 
-      # Point the WebUI at the miotts service (Docker internal hostname)
+      # host.docker.internal is used because network_mode: bridge disables
+      # Compose's internal DNS (service names won't resolve).
       MIOTTS_API_BASE: "http://miotts:8001"
+
+    networks:
+      - emil-net
+
+# ─────────────────────────────────────────────────────────────────────────────
+# External network – must be created before `docker compose up`:
+#   docker network create emil-net
+# Other Compose projects can join this network the same way.
+# ─────────────────────────────────────────────────────────────────────────────
+networks:
+  emil-net:
+    external: true
