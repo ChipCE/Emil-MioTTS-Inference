@@ -1,0 +1,20 @@
+services:
+  emil-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: emil-backend
+    # Bind to all host interfaces so other devices on the network can reach it
+    ports:
+      - "0.0.0.0:8000:8000"
+    volumes:
+      # Mount the frontend directory so model/config files are editable from the host
+      - ./frontend:/app/frontend
+      # Mount uploads directory as writable (audio uploads via /api/upload)
+      - ./backend/uploads:/app/backend/uploads
+    # Use host network mode is an alternative, but explicit port binding above
+    # already exposes the service on the host IP. Keeping bridge for isolation.
+    network_mode: bridge
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1

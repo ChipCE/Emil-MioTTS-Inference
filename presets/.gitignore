@@ -1,0 +1,11 @@
+# Ignore all preset files added in the future
+*.pt
+*.npy
+*.npz
+*.json
+
+# Keep the bundled default presets
+!en_female.pt
+!en_male.pt
+!jp_female.pt
+!jp_male.pt

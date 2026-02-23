@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# uv / pixi environments (don't copy into image; uv sync runs inside)
+.venv
+.pixi
+
+# HuggingFace cache (can be large; use a named volume instead)
+.cache/
+
+# Docs & examples
+README.md
+README_ja.md
+example_from_other_service/
+
+# Docker files themselves (no need in build context)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store

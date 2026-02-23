@@ -1,0 +1,123 @@
+services:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # MioTTS API server  (run_server.py)
+  # ─────────────────────────────────────────────────────────────────────────
+  miotts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: miotts-server
+    restart: unless-stopped
+
+    # run_server.py is the default CMD in the Dockerfile
+    # (no `command:` override needed here)
+
+    ports:
+      - "0.0.0.0:8001:8001"
+
+    # Reach LMStudio (or any service) running on the host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # NVIDIA T400 GPU
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    volumes:
+      # Preset audio files – add / remove without rebuilding
+      - ./presets:/app/presets
+      # Raw media files (source audio for preset generation, etc.)
+      - ./raw_media:/app/raw_media
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+
+      # ── Server ─────────────────────────────────────────────────────────────
+      MIOTTS_HOST: "0.0.0.0"
+      MIOTTS_PORT: "8001"
+      MIOTTS_LOG_LEVEL: "info"
+
+      # ── LMStudio on host:1234 (OpenAI-compatible) ──────────────────────────
+      # Override these without rebuilding by editing this file.
+      MIOTTS_LLM_BASE_URL: "http://host.docker.internal:1234/v1"
+      MIOTTS_LLM_MODEL: "miotts"      # ← set to the model slug shown in LMStudio
+      # MIOTTS_LLM_API_KEY: "lm-studio"    # uncomment if LMStudio requires a key
+      MIOTTS_LLM_TIMEOUT: "120.0"
+
+      # ── Sampling (optional overrides) ──────────────────────────────────────
+      # MIOTTS_LLM_TEMPERATURE: "0.8"
+      # MIOTTS_LLM_TOP_P: "1.0"
+      # MIOTTS_LLM_MAX_TOKENS: "700"
+
+      # ── Device & codec ─────────────────────────────────────────────────────
+      MIOTTS_DEVICE: "cuda"
+      MIOTTS_CODEC_MODEL: "Aratako/MioCodec-25Hz-44.1kHz-v2"
+
+      # ── Presets ────────────────────────────────────────────────────────────
+      MIOTTS_PRESETS_DIR: "/app/presets"
+
+      # ── Input limits ───────────────────────────────────────────────────────
+      MIOTTS_MAX_TEXT_LENGTH: "300"
+      MIOTTS_MAX_REFERENCE_MB: "20"
+
+      # ── Best-of-N (disabled by default) ────────────────────────────────────
+      MIOTTS_BEST_OF_N_ENABLED: "false"
+      # MIOTTS_BEST_OF_N_DEFAULT: "3"
+      # MIOTTS_BEST_OF_N_MAX: "8"
+      # MIOTTS_BEST_OF_N_LANGUAGE: "auto"
+
+      # ── ASR for Best-of-N ─────────────────────────────────────────────────
+      # MIOTTS_ASR_MODEL: "openai/whisper-large-v3-turbo"
+      # MIOTTS_ASR_BATCH_SIZE: "0"
+      # MIOTTS_ASR_LANGUAGE: "auto"
+
+      # ── HuggingFace model cache ────────────────────────────────────────────
+      HF_HOME: "/root/.cache/huggingface"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Gradio WebUI  (run_gradio.py)
+  # ─────────────────────────────────────────────────────────────────────────
+  miotts-gradio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: miotts-gradio
+    restart: unless-stopped
+
+    # Override the default CMD to launch the gradio app instead
+    command: ["run_gradio.py"]
+
+    ports:
+      - "0.0.0.0:7860:7860"
+
+    # Gradio talks to the miotts API service (internal Docker network)
+    depends_on:
+      - miotts
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # Gradio itself doesn't use the GPU, but uncomment if needed
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+
+      # Bind Gradio to all interfaces so it's reachable from other machines
+      GRADIO_SERVER_NAME: "0.0.0.0"
+      GRADIO_SERVER_PORT: "7860"
+
+      # Point the WebUI at the miotts service (Docker internal hostname)
+      MIOTTS_API_BASE: "http://miotts:8001"

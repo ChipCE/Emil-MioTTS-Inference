@@ -1,0 +1,17 @@
+# Ignore all media and audio files added here
+*.wav
+*.flac
+*.ogg
+*.mp3
+*.aac
+*.m4a
+*.opus
+*.aiff
+*.aif
+*.wma
+*.pt
+*.npy
+*.npz
+
+# Keep the placeholder so the directory stays tracked
+!DONT_DELETE.md
