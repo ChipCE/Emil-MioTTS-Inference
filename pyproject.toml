@@ -14,6 +14,7 @@ dependencies = [
     "nltk",
     "pyopenjtalk",
     "python-multipart>=0.0.9",
+    "pydub>=0.25.0",
     "soundfile",
     "transformers<5",
     "uvicorn>=0.30.0",
@@ -23,6 +24,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff>=0.9.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.27.0",
 ]
 
 [tool.ruff]
@@ -49,7 +53,11 @@ ignore = [
 "__init__.py" = ["F401"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["miotts_server"]
+known-first-party = ["miotts_server", "elevenlab_endpoint"]
+
+[tool.pytest.ini_options]
+testpaths = ["elevenlab_endpoint/tests"]
+asyncio_mode = "auto"
 
 [tool.ruff.format]
 quote-style = "double"
