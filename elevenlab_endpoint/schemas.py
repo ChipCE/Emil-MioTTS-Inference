@@ -27,6 +27,10 @@ class VoiceSettings(BaseModel):
     similarity_boost: float | None = Field(default=None, ge=0.0, le=1.0)
     style: float | None = Field(default=None, ge=0.0, le=1.0)
     use_speaker_boost: bool | None = None
+    speed: float | None = None
+
+    class Config:
+        extra = "ignore"
 
 
 class TTSRequestBody(BaseModel):
@@ -43,6 +47,9 @@ class TTSRequestBody(BaseModel):
     output_format: str | None = None
     optimize_streaming_latency: int | None = None
     language_code: str | None = None
+
+    class Config:
+        extra = "ignore"
 
 
 # ---------------------------------------------------------------------------

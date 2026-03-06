@@ -77,6 +77,24 @@ Located at `elevenlab_endpoint/config.json` by default. Override the path with t
 }
 ```
 
+### openclaw.json
+
+```json
+"tts": {
+      "auto": "always",
+      "provider": "elevenlabs",
+      "maxTextLength": 4000,
+      "elevenlabs": {
+        "baseUrl": "http://192.168.1.100:8002",
+        "apiKey": "sk_b1f67647955ef240a84a0e3e819101761a087277ac8ad912",
+        "voiceId": "jpfemale01",
+        "modelId": "jpfemale01",
+        "languageCode": "ja"
+      }
+    }
+```
+
+
 > Set any `llm` field to `null` to use miotts_server's own defaults for that parameter.
 
 ### Environment Variables
