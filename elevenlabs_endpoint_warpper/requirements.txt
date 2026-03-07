@@ -3,6 +3,7 @@ fastapi>=0.111.0
 uvicorn>=0.30.0
 httpx>=0.27.0
 pydantic>=2.0.0
+emoji>=2.15.0
 
 # Optional: WAV→MP3 transcoding (set transcode_mp3=true in config.json)
 # Also requires ffmpeg installed on your system PATH.

@@ -113,8 +113,8 @@ def main() -> None:
 
     import uvicorn
 
-    from elevenlab_endpoint.config import get_config
-    from elevenlab_endpoint.api import app
+    from elevenlabs_endpoint_warpper.config import get_config
+    from elevenlabs_endpoint_warpper.api import app
 
     # Log the effective config so the user can verify the settings being used.
     cfg = get_config()

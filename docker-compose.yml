@@ -63,7 +63,7 @@ services:
       MIOTTS_PRESETS_DIR: "/app/presets"
 
       # ── Input limits ───────────────────────────────────────────────────────
-      MIOTTS_MAX_TEXT_LENGTH: "5000"
+      MIOTTS_MAX_TEXT_LENGTH: "300"
       MIOTTS_MAX_REFERENCE_MB: "20"
 
       # ── Best-of-N (disabled by default) ────────────────────────────────────

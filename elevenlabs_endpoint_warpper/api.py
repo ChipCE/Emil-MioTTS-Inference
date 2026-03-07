@@ -17,6 +17,7 @@ from __future__ import annotations
 import io
 import logging
 
+import emoji
 import httpx
 from fastapi import FastAPI, Header, HTTPException, Path
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -69,6 +70,12 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _process_text(text: str) -> str:
+    """Process text to replace emojis with purely English words."""
+    text = emoji.demojize(text, delimiters=(",", ","))
+    return text.replace("_", " ").replace("-", " ")
 
 
 def _validate_api_key(xi_api_key: str | None) -> None:
@@ -426,14 +433,22 @@ async def text_to_speech(
             status_code=422,
             detail={"status": "error", "message": "text must not be empty."},
         )
+        
+    processed_text = _process_text(body.text)
+    if not processed_text.strip():
+        raise HTTPException(
+            status_code=422,
+            detail={"status": "error", "message": "text must not be empty after processing."},
+        )
+
     preset_id = await _resolve_voice_or_404(voice_id)
     logger.info(
         "TTS request: voice_id=%r → preset_id=%r text_len=%d",
         voice_id,
         preset_id,
-        len(body.text),
+        len(processed_text),
     )
-    wav_bytes = await _fetch_wav_from_miotts(body.text, preset_id, language_code=body.language_code)
+    wav_bytes = await _fetch_wav_from_miotts(processed_text, preset_id, language_code=body.language_code)
     return _build_audio_response(wav_bytes, stream=False)
 
 
@@ -473,14 +488,22 @@ async def text_to_speech_stream(
             status_code=422,
             detail={"status": "error", "message": "text must not be empty."},
         )
+        
+    processed_text = _process_text(body.text)
+    if not processed_text.strip():
+        raise HTTPException(
+            status_code=422,
+            detail={"status": "error", "message": "text must not be empty after processing."},
+        )
+        
     preset_id = await _resolve_voice_or_404(voice_id)
     logger.info(
         "TTS stream request: voice_id=%r → preset_id=%r text_len=%d",
         voice_id,
         preset_id,
-        len(body.text),
+        len(processed_text),
     )
-    wav_bytes = await _fetch_wav_from_miotts(body.text, preset_id, language_code=body.language_code)
+    wav_bytes = await _fetch_wav_from_miotts(processed_text, preset_id, language_code=body.language_code)
     # miotts_server produces the full audio synchronously, so we stream it
     # as a single chunk. True chunk-by-chunk streaming would require changes
     # in miotts_server itself.
