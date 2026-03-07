@@ -14,6 +14,7 @@ depending on the ``PROXY_TRANSCODE_MP3`` config flag.
 
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
 import re
@@ -521,11 +522,17 @@ async def text_to_speech(
         len(chunks),
     )
     
-    audio_chunks = []
-    for chunk in chunks:
-        chunk_wav = await _fetch_wav_from_miotts(chunk, preset_id, language_code=body.language_code)
-        if chunk_wav:
-            audio_chunks.append(chunk_wav)
+    tasks = [
+        _fetch_wav_from_miotts(chunk, preset_id, language_code=body.language_code)
+        for chunk in chunks
+    ]
+    
+    try:
+        results = await asyncio.gather(*tasks)
+        audio_chunks = [wav for wav in results if wav]
+    except Exception as e:
+        logger.error("Error generating audio chunks concurrently: %s", e)
+        raise
             
     if not audio_chunks:
         raise HTTPException(
@@ -591,11 +598,17 @@ async def text_to_speech_stream(
         len(chunks),
     )
     
-    audio_chunks = []
-    for chunk in chunks:
-        chunk_wav = await _fetch_wav_from_miotts(chunk, preset_id, language_code=body.language_code)
-        if chunk_wav:
-            audio_chunks.append(chunk_wav)
+    tasks = [
+        _fetch_wav_from_miotts(chunk, preset_id, language_code=body.language_code)
+        for chunk in chunks
+    ]
+    
+    try:
+        results = await asyncio.gather(*tasks)
+        audio_chunks = [wav for wav in results if wav]
+    except Exception as e:
+        logger.error("Error generating audio stream chunks concurrently: %s", e)
+        raise
             
     if not audio_chunks:
         raise HTTPException(
