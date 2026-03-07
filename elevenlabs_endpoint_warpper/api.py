@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import io
 import logging
+import re
+import wave
 
 import emoji
 import httpx
@@ -76,6 +78,74 @@ def _process_text(text: str) -> str:
     """Process text to replace emojis with purely English words."""
     text = emoji.demojize(text, delimiters=(",", ","))
     return text.replace("_", " ").replace("-", " ")
+
+
+def _split_text(text: str, max_length: int = 250) -> list[str]:
+    """Split text into chunks of at most max_length characters using sentence/word boundaries."""
+    # Split by common sentence terminators but keep the punctuation attached
+    # \s* removes trailing spaces after punctuation inside the chunks.
+    sentences = re.split(r'(?<=[.!?。！？])\s+', text.strip())
+    
+    chunks = []
+    current_chunk = ""
+    
+    for sentence in sentences:
+        if not sentence:
+            continue
+            
+        # Check if adding the sentence would exceed max limit
+        if len(current_chunk) + (1 if current_chunk else 0) + len(sentence) > max_length:
+            if current_chunk:
+                chunks.append(current_chunk)
+                current_chunk = ""
+                
+            if len(sentence) > max_length:
+                # If a single sentence exceeds the max limit, split by word boundaries (spaces)
+                words = sentence.split(' ')
+                for word in words:
+                    if len(current_chunk) + (1 if current_chunk else 0) + len(word) > max_length:
+                        if current_chunk:
+                            chunks.append(current_chunk)
+                            current_chunk = ""
+                        if len(word) > max_length:
+                            # Edge case: A single word is > max_length. Cut it forcibly (though rare).
+                            chunks.append(word)
+                            current_chunk = ""
+                        else:
+                            current_chunk = word
+                    else:
+                        current_chunk += (" " if current_chunk else "") + word
+            else:
+                current_chunk = sentence
+        else:
+            current_chunk += (" " if current_chunk else "") + sentence
+            
+    if current_chunk:
+        chunks.append(current_chunk)
+        
+    return chunks
+
+
+def _concatenate_wavs(wav_bytes_list: list[bytes]) -> bytes:
+    """Concatenate a list of raw WAV byte strings into a single WAV byte string."""
+    if not wav_bytes_list:
+        return b""
+    if len(wav_bytes_list) == 1:
+        return wav_bytes_list[0]
+        
+    out_buffer = io.BytesIO()
+    with wave.open(out_buffer, 'wb') as out_wav:
+        for i, wav_bytes in enumerate(wav_bytes_list):
+            try:
+                with wave.open(io.BytesIO(wav_bytes), 'rb') as in_wav:
+                    if i == 0:
+                        out_wav.setparams(in_wav.getparams())
+                    out_wav.writeframes(in_wav.readframes(in_wav.getnframes()))
+            except EOFError:
+                # Occurs if miotts_server returned invalid truncated WAV chunks
+                logger.warning("Encountered corrupt WAV chunk during concatenation, skipping.")
+                continue
+    return out_buffer.getvalue()
 
 
 def _validate_api_key(xi_api_key: str | None) -> None:
@@ -442,13 +512,28 @@ async def text_to_speech(
         )
 
     preset_id = await _resolve_voice_or_404(voice_id)
+    chunks = _split_text(processed_text, max_length=250)
     logger.info(
-        "TTS request: voice_id=%r → preset_id=%r text_len=%d",
+        "TTS request: voice_id=%r → preset_id=%r text_len=%d chunks=%d",
         voice_id,
         preset_id,
         len(processed_text),
+        len(chunks),
     )
-    wav_bytes = await _fetch_wav_from_miotts(processed_text, preset_id, language_code=body.language_code)
+    
+    audio_chunks = []
+    for chunk in chunks:
+        chunk_wav = await _fetch_wav_from_miotts(chunk, preset_id, language_code=body.language_code)
+        if chunk_wav:
+            audio_chunks.append(chunk_wav)
+            
+    if not audio_chunks:
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "message": "Failed to generate any audio."}
+        )
+        
+    wav_bytes = _concatenate_wavs(audio_chunks)
     return _build_audio_response(wav_bytes, stream=False)
 
 
@@ -497,14 +582,30 @@ async def text_to_speech_stream(
         )
         
     preset_id = await _resolve_voice_or_404(voice_id)
+    chunks = _split_text(processed_text, max_length=250)
     logger.info(
-        "TTS stream request: voice_id=%r → preset_id=%r text_len=%d",
+        "TTS stream request: voice_id=%r → preset_id=%r text_len=%d chunks=%d",
         voice_id,
         preset_id,
         len(processed_text),
+        len(chunks),
     )
-    wav_bytes = await _fetch_wav_from_miotts(processed_text, preset_id, language_code=body.language_code)
-    # miotts_server produces the full audio synchronously, so we stream it
-    # as a single chunk. True chunk-by-chunk streaming would require changes
-    # in miotts_server itself.
+    
+    audio_chunks = []
+    for chunk in chunks:
+        chunk_wav = await _fetch_wav_from_miotts(chunk, preset_id, language_code=body.language_code)
+        if chunk_wav:
+            audio_chunks.append(chunk_wav)
+            
+    if not audio_chunks:
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "error", "message": "Failed to generate any audio."}
+        )
+        
+    wav_bytes = _concatenate_wavs(audio_chunks)
+    # miotts_server produces chunks synchronously, we pre-concatenate them 
+    # and then stream as a single file because transcoding to MP3 (if enabled)
+    # requires the full file anyway. True chunk-by-chunk streaming would require
+    # changes in miotts_server itself, and a custom realtime transcoder wrapper.
     return _build_audio_response(wav_bytes, stream=True)
